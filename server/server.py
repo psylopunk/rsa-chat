@@ -1,4 +1,4 @@
-
+import json
 import asyncio
 import websockets
 
@@ -15,6 +15,7 @@ async def websocket_handler(websocket, path):
     if box not in boxes: boxes[box] = {"clients": []}
     if "pubkey" not in data: return await websocket.send(json.dumps({"success": False, "err": "Pubkey not specified"}))
     clients[login] = data["pubkey"]
+    print("Connected client [%s]" % login)
     while True:
         data = json.loads(await websocket.recv())
 
