@@ -3,13 +3,11 @@ import asyncio
 import websockets
 
 boxes = {}
-clients = {}
 
 async def websocket_handler(websocket, path):
     data = json.loads(await websocket.recv())
     if "login" not in data: return await websocket.send(json.dumps({"success": False, "err": "Login not specified"}))
     login = data["login"]
-    if login in clients: return await websocket.send(json.dumps({"success": False, "err": "Login busy"}))
     if "box" not in data: return await websocket.send(json.dumps({"success": False, "err": "Box not specified"}))
     box = data["box"]
     if box not in boxes: boxes[box] = {"clients": []}
@@ -19,6 +17,12 @@ async def websocket_handler(websocket, path):
     print("Connected client [%s]" % login)
     while True:
         data = json.loads(await websocket.recv())
+        if "action" not in data: await websocket.send(json.dumps({"success": False, "err": "Action not specified"})); continue
+        action = data["action"]
+        if action == "get_clients":
+            if "box" not in data: await websocket.send(json.dumps({"success": False, "err": "Box not specified"})); continue
+            if data["box"] not in boxes: boxes[box] = {"clients": []}
+            await websocket.send(json.dumps({"success": True, "err": "", "data": {"clients": [client["pubkey"] for client in boxes[data["box"]]["clients"]]}}))
 
 
         return await websocket.send(json.dumps({"success": False, "err": "Unknown error"}))
