@@ -13,7 +13,7 @@ async def websocket_handler(websocket, path):
     if box not in boxes: boxes[box] = {"clients": []}
     if "pubkey" not in data: return await websocket.send(json.dumps({"success": False, "err": "Pubkey not specified"}))
     boxes[box]["clients"].append({"login": login, "pubkey": data["pubkey"], "ws": websocket})
-    await websocket.send(json.dumps({"success": True, "err": ""}))
+    await websocket.send(json.dumps({"action": "connect", "success": True, "err": ""}))
     print("Connected client [%s]" % login)
     while True:
         data = json.loads(await websocket.recv())
@@ -22,10 +22,14 @@ async def websocket_handler(websocket, path):
         if action == "get_clients":
             if "box" not in data: await websocket.send(json.dumps({"success": False, "err": "Box not specified"})); continue
             if data["box"] not in boxes: boxes[box] = {"clients": []}
-            await websocket.send(json.dumps({"success": True, "err": "", "data": {"clients": [client["pubkey"] for client in boxes[data["box"]]["clients"]]}}))
+            await websocket.send(json.dumps({"action": "get_clients", "success": True, "err": "", "data": {"clients": [client["pubkey"] for client in boxes[data["box"]]["clients"]]}}))
+        elif action == "send_message":
+            if "box" not in data: await websocket.send(json.dumps({"success": False, "err": "Box not specified"})); continue
+            if data["box"] not in boxes: boxes[box] = {"clients": []}
+            for client in boxes[data["box"]]["clients"]:
+                await client["ws"].send(json.dumps({"action": "receive_message", "login": login, "data": data["message"]}))
 
-
-        return await websocket.send(json.dumps({"success": False, "err": "Unknown error"}))
+        else: await websocket.send(json.dumps({"action": "unknown", "success": False, "err": "Unknown error"}))
 
 
 
