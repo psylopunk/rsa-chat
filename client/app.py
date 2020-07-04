@@ -1,4 +1,5 @@
 from PyQt5 import QtWidgets, uic
+from PyQt5.QtCore import QThread, pyqtSignal
 import threading
 import websocket
 import rsa
@@ -21,10 +22,10 @@ def on_message(ws, message):
         window.ws.send(json.dumps({"action": "send_message", "box": window.box, "message": crypted_messages}))
     elif action == "receive_message":
         for message in data["data"]:
-            try:
-                decrypted = rsa.decrypt(bytes(bytearray.fromhex(message)), window.privateKey).decode("utf8")
-                window.textBrowser.setText(window.textBrowser.toPlainText() + ("[%s]: %s\n" % (data["login"], decrypted)))
-            except: pass
+            # try:
+            decrypted = rsa.decrypt(bytes(bytearray.fromhex(message)), window.privateKey).decode("utf8")
+            window.add_text_to_browser("[%s]: %s\n" % (data["login"], decrypted))
+            # except: pass
 
 def on_error(ws, error):
     print("Error websockets")
@@ -34,6 +35,14 @@ def on_close(ws):
     window.connect_ws()
     window.ws.send(json.dumps({"login": self.name, "box": self.box, "pubkey": self.rawPublicKey}))
 
+class WebSocketHandler(QThread):
+    def __init__(self):
+        super().__init__()
+
+    def run(self):
+        websocket.enableTrace(True)
+        self.ws = websocket.WebSocketApp("ws://%s/" % (HOST), on_message = on_message, on_error = on_error, on_close = on_close)
+        self.ws.run_forever()
 
 class ConnectGui(QtWidgets.QMainWindow, design_connect.Ui_MainWindow):
     def __init__(self):
@@ -56,10 +65,13 @@ class AppGui(QtWidgets.QMainWindow, design_app.Ui_MainWindow):
 
         self.btnSend.clicked.connect(self.send_message)
 
+    def add_text_to_browser(self, text):
+        self.textBrowser.setText(self.textBrowser.toPlainText() + text)
+
     def connect_ws(self):
-        websocket.enableTrace(True)
-        self.ws = websocket.WebSocketApp("ws://%s/" % (HOST), on_message = on_message, on_error = on_error, on_close = on_close)
-        threading.Thread(target=self.ws.run_forever, args=[]).start()
+        self.ws_handler = WebSocketHandler()
+        threading.Thread(target=self.ws_handler.run(), args=[]).start()
+        self.ws = self.ws_handler.ws
 
     def connectBox(self):
         self.box = self.connectGui.inputBox.text()
@@ -73,8 +85,6 @@ class AppGui(QtWidgets.QMainWindow, design_app.Ui_MainWindow):
 
     def send_message(self):
         self.ws.send(json.dumps({"action": "get_clients", "box": self.box}))
-
-        # self.textBrowser.setText(self.inputMessage.text())
 
 def main():
     global window
