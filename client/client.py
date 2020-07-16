@@ -24,6 +24,7 @@ class Client:
         while True:
             self.message = input()
             if self.message == "q": os._exit(1)
+            if not self.message: continue
             self.ws.send(json.dumps({"action": "get_clients", "room": self.room}))
         with self.lock: self.ws.close()
 
@@ -34,7 +35,7 @@ class Client:
             action = data["action"]
             if action == "connect":
                 if data["success"]: print("Connected to WebsocketServer")
-                else: print("WebsocketServer is not available"); os._exit(1)
+                else: print("WebsocketServer returned Error [%s]" % data["err"]); os._exit(1)
             elif action == "wait_connect":
                 self.ws.send(json.dumps({"login": self.login, "room": self.room, "pubkey": self.rawPublicKey}))
             elif action == "get_clients":

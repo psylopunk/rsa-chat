@@ -23,12 +23,14 @@ async def websocket_handler(websocket, path):
         await websocket.send(json.dumps({"action": "wait_connect"}))
         data = json.loads(await websocket.recv())
         print("[WS] < %s" % data)
-        if "login" not in data: return await websocket.send(json.dumps({"success": False, "err": "Login not specified"}))
-        if "room" not in data: return await websocket.send(json.dumps({"success": False, "err": "Room not specified"}))
-        if "pubkey" not in data: return await websocket.send(json.dumps({"success": False, "err": "Pubkey not specified"}))
+        if "login" not in data: return await websocket.send(json.dumps({"action": "connect", "success": False, "err": "Login not specified"}))
+        if "room" not in data: return await websocket.send(json.dumps({"action": "connect", "success": False, "err": "Room not specified"}))
+        if "pubkey" not in data: return await websocket.send(json.dumps({"action": "connect", "success": False, "err": "Pubkey not specified"}))
         login = data["login"]
         room = data["room"]
         if room not in rooms: rooms[room] = {"clients": []}
+        for client in rooms[room]["clients"]:
+            if client["login"] == login: return await websocket.send(json.dumps({"action": "connect", "success": False, "err": "Login is busy"}))
         rooms[room]["clients"].append({"login": login, "pubkey": data["pubkey"], "ws": websocket})
         await websocket.send(json.dumps({"action": "connect", "success": True, "err": ""}))
         print("Connected client [%s]" % login)
