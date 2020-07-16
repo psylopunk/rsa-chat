@@ -1,6 +1,7 @@
 import os
 import rsa
 import threading
+import time
 import json
 import websocket
 
@@ -9,27 +10,32 @@ config = {
 }
 
 class Client:
-    def __init__(self):
+    def __init__(self, host=False, room=False, login=False):
         self.lock = threading.Lock()
+        self.live = True
         print("Client started")
-        self.host = input("Host:Port [%s]: " % config["HOST"]) or config["HOST"]
-        self.room = input("Room: ")
-        self.login = input("Login: ")
+        self.host = host or input("Host:Port [%s]: " % config["HOST"]) or config["HOST"]
+        self.room = room or input("Room: ")
+        self.login = login or input("Login: ")
         if not self.room or not self.login: print("Room/Login is not specified"); os._exit(1)
         self.publicKey, self.privateKey = rsa.newkeys(512)
         self.rawPublicKey = self.publicKey.save_pkcs1("PEM").hex()
         print("Keys are generated")
         self.websocket_connect()
         print("Send \"q\" to exit")
-        while True:
-            self.message = input()
-            if self.message == "q": os._exit(1)
-            if not self.message: continue
-            self.ws.send(json.dumps({"action": "get_clients", "room": self.room}))
+        try:
+            while True:
+                self.message = input()
+                if self.message == "q": os._exit(1)
+                if not self.message: continue
+                self.ws.send(json.dumps({"action": "get_clients", "room": self.room}))
+        except:
+            print("Connection terminated")
+            self.reconnect()
         with self.lock: self.ws.close()
 
     def recv_func(self):
-        while True:
+        while self.live:
             try: data = json.loads(self.ws.recv())
             except: continue
             action = data["action"]
@@ -49,16 +55,22 @@ class Client:
                         print("[%s]: %s" % (data["login"], decrypted))
                     except: pass
 
-    def websocket_connect(self):
+    def websocket_connect(self, reconnect=False):
         self.ws = websocket.WebSocket()
-        self.ws.connect("ws://%s/" % self.host)
-        self.recv_thread = threading.Thread(target=self.recv_func, args=[])
-        self.recv_thread.daemon = True
-        self.recv_thread.start()
+        try:
+            self.ws.connect("ws://%s/" % self.host)
+            self.recv_thread = threading.Thread(target=self.recv_func, args=[])
+            self.recv_thread.daemon = True
+            self.recv_thread.start()
+        except:
+            print("WebsocketServer unavailable")
+            self.live = False
+            self.reconnect()
 
     def reconnect(self):
-        print("Reconnect inited")
-        # TODO: Reconnect function
+        print("Reconnect in 3 second")
+        time.sleep(3)
+        client = Client(host=self.host, room=self.room, login=self.login)
 
 if __name__ == '__main__':
     client = Client()
