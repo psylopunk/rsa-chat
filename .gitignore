@@ -1,4 +1,4 @@
 
 *.pyc
 *.ui
-temp/oldserver.py
+temp/
